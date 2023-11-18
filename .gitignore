@@ -18,6 +18,9 @@ main
 # Go workspace file
 go.work
 
+# SQLite
+*.db
+
 # Custom
 prompt.md
 scratch*.*

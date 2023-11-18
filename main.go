@@ -1,7 +1,16 @@
 package main
 
-import "fmt"
+import (
+	"log"
+	"net/http"
+)
 
 func main() {
-	fmt.Println("hello, 🌍")
+	db, err := initDB()
+	if err != nil {
+		log.Fatal("Error initializing database: ", err)
+	}
+
+	http.HandleFunc("/pokemon/", getPokemonHandler(db))
+	http.ListenAndServe(":8080", nil)
 }
