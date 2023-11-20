@@ -5,51 +5,49 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 func getPokemonHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Received request: %v\n", r)
+		w.Header().Set("Content-Type", "application/json")
 
 		query := r.URL.Query()
 		name := query.Get("name")
 
-		w.Header().Set("Content-Type", "application/json")
+		var err error
+		var pokemon interface{}
 
 		if name != "" {
-			log.Printf("Request to fetch Pokemon with name: %s\n", name)
-			pokemon, err := getOnePokemonService(name, db)
-			if err != nil {
-				log.Printf("Error fetching Pokemon with name %s: %v\n", name, err)
-				status := http.StatusInternalServerError
-				if err == sql.ErrNoRows {
-					status = http.StatusNotFound
-				}
-				http.Error(w, http.StatusText(status), status)
-				return
-			}
-			log.Printf("Successfully fetched Pokemon with name: %s\n", name)
-
-			if err := json.NewEncoder(w).Encode(pokemon); err != nil {
-				log.Printf("Error encoding Pokemon to JSON: %v\n", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
+			pokemon, err = getOnePokemonService(db, name)
 		} else {
-			log.Println("[Default] Request to get all existing Pokemon")
-			pokemon, err := getAllPokemonService(db)
-			if err != nil {
-				log.Printf("Error fetching all Pokemon: %v\n", err)
-				http.Error(w, "Failed to fetch pokemon", http.StatusInternalServerError)
-				return
-			}
-			log.Println("Successfully fetched all Pokemon")
+			pokemon, err = getAllPokemonService(db)
+		}
 
-			if err := json.NewEncoder(w).Encode(pokemon); err != nil {
-				log.Printf("Error encoding all Pokemon to JSON: %v\n", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
+		if err != nil {
+			handleError(w, "Error fetching Pokemon", err)
+			return
+		}
+
+		if err := json.NewEncoder(w).Encode(pokemon); err != nil {
+			handleError(w, "Error encoding Pokemon to JSON", err)
 		}
 	}
+}
+
+func handleError(w http.ResponseWriter, msg string, err error) {
+	status := http.StatusInternalServerError
+
+	if err == sql.ErrNoRows {
+		status = http.StatusNotFound
+		msg = "Pokemon not found"
+	} else if strings.Contains(err.Error(), "invalid character 'N' looking for beginning of value") {
+		status = http.StatusBadRequest
+		msg = "Invalid input format"
+	}
+
+	log.Printf("%s: %v\n", msg, err)
+	http.Error(w, msg, status)
 }

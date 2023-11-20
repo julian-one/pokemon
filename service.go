@@ -11,7 +11,7 @@ type Pokemon struct {
 	Weight int    `json:"weight"`
 }
 
-func getOnePokemonService(pokemonName string, db *sql.DB) (Pokemon, error) {
+func getOnePokemonService(db *sql.DB, pokemonName string) (Pokemon, error) {
 	pokemon, err := getOnePokemonFromDB(db, pokemonName)
 	if err != nil {
 		if err == sql.ErrNoRows {

@@ -15,6 +15,7 @@ const (
 			"weight" INTEGER
 		);
 	`
+	nameIndexSQL        = `CREATE INDEX IF NOT EXISTS idx_pokemon_name ON pokemon(name);`
 	selectAllPokemonSQL = `SELECT id, name, height, weight FROM pokemon`
 	selectOnePokemonSQL = `SELECT id, name, height, weight FROM pokemon WHERE name = ? LIMIT 1`
 	insertPokemonSQL    = `INSERT INTO pokemon (id, name, height, weight) VALUES (?, ?, ?, ?)`
@@ -31,11 +32,16 @@ func initDB() (*sql.DB, error) {
 		return nil, err
 	}
 
+	_, err = db.Exec(nameIndexSQL)
+	if err != nil {
+		return nil, err
+	}
+
 	return db, nil
 }
 
 func getAllPokemonFromDB(db *sql.DB) ([]Pokemon, error) {
-	var pokemon []Pokemon
+	pokemon := make([]Pokemon, 0)
 	rows, err := db.Query(selectAllPokemonSQL)
 
 	if err != nil {
