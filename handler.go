@@ -42,10 +42,10 @@ func handleError(w http.ResponseWriter, msg string, err error) {
 
 	if err == sql.ErrNoRows {
 		status = http.StatusNotFound
-		msg = "Pokemon not found"
+		msg = "Pokemon not found."
 	} else if strings.Contains(err.Error(), "invalid character 'N' looking for beginning of value") {
-		status = http.StatusBadRequest
-		msg = "Invalid input format"
+		status = http.StatusNotFound
+		msg = "Pokemon not found. Details: invalid input format"
 	}
 
 	log.Printf("%s: %v\n", msg, err)

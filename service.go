@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"strings"
 )
 
 type Pokemon struct {
@@ -12,10 +13,12 @@ type Pokemon struct {
 }
 
 func getOnePokemonService(db *sql.DB, pokemonName string) (Pokemon, error) {
-	pokemon, err := getOnePokemonFromDB(db, pokemonName)
+	lowerCasePokemonName := strings.ToLower(pokemonName)
+
+	pokemon, err := getOnePokemonFromDB(db, lowerCasePokemonName)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return searchAndSavePokemon(db, pokemonName)
+			return searchAndSavePokemon(db, lowerCasePokemonName)
 		}
 		return Pokemon{}, err
 	}
