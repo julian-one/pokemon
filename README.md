@@ -1,7 +1,34 @@
-# Requirements
+# Pokemon API
 
-- 1. Create a Golang API with a single route to handle Pokémon information requests, it should:
-    - a. Fetch Pokémon information from the Pokémon API. (Documented [here](https://pokeapi.co/)).
-    - b. Store the fetched Pokémon's height and weight information in a SQLite database.
-    - c. Return the Pokémon's height and weight information to the caller in JSON format.
+A lightweight Go API that fetches Pokémon data from [PokeAPI](https://pokeapi.co/) and caches it in SQLite.
 
+## Quick Start
+
+```bash
+go run main.go
+```
+
+Server starts on `http://localhost:8080`
+
+## Endpoints
+
+### `GET /pokemon?name={name}`
+Fetch and save a Pokémon by name. Returns height and weight as JSON.
+
+```bash
+curl "http://localhost:8080/pokemon?name=pikachu"
+```
+
+### `GET /`
+List all cached Pokémon.
+
+```bash
+curl http://localhost:8080/
+```
+
+## Features
+
+- Fetches Pokémon data from PokeAPI
+- Stores height and weight in SQLite
+- Avoids duplicate saves
+- JSON logging with structured output

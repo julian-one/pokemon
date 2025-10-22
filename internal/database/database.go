@@ -29,9 +29,9 @@ func Initialize() (*sqlx.DB, error) {
 
 type Pokemon struct {
 	Id     int     `json:"pokemon_id" db:"pokemon_id"`
-	Name   string  `json:"name" db:"name"`
-	Height float64 `json:"height" db:"height"`
-	Weight float64 `json:"weight" db:"weight"`
+	Name   string  `json:"name"       db:"name"`
+	Height float64 `json:"height"     db:"height"`
+	Weight float64 `json:"weight"     db:"weight"`
 }
 
 func GetAll(db *sqlx.DB) ([]Pokemon, error) {

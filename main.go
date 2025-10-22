@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
+	"time"
+
 	"pokemon/internal/api"
 	"pokemon/internal/database"
 
@@ -12,33 +14,61 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
 	db, err := database.Initialize()
 	if err != nil {
-		log.Fatalf("Error initializing database %v", err)
+		slog.Error("Failed to initialize database", "error", err)
+		os.Exit(1)
 	}
+	defer db.Close()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", FetchSavedPokemon(db))
-	mux.HandleFunc("/pokemon", FetchPokemon(db))
+	mux.HandleFunc("GET /", FetchSavedPokemon(db))
+	mux.HandleFunc("GET /pokemon", FetchPokemon(db))
 
-	if err := http.ListenAndServe(":8080", mux); err != nil {
-		log.Fatalf("Error starting server: %v", err)
+	handler := loggingMiddleware(mux)
+
+	slog.Info("Server starting", "port", 8080)
+	if err := http.ListenAndServe(":8080", handler); err != nil {
+		slog.Error("Server failed to start", "error", err)
+		os.Exit(1)
 	}
-	log.Println("Server started on port 8080")
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		next.ServeHTTP(w, r)
+
+		slog.Info("request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"duration_ms", time.Since(start).Milliseconds(),
+		)
+	})
 }
 
 func FetchSavedPokemon(db *sqlx.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p, err := database.GetAll(db)
 		if err != nil {
+			slog.Error("Failed to fetch all pokemon", "error", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = fmt.Fprintf(w, "Error fetching all pokemon: %s", err)
+			if err := json.NewEncoder(w).Encode(map[string]string{"error": "Error fetching all pokemon"}); err != nil {
+				slog.Error("Failed to encode error response", "error", err)
+			}
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(p)
+		if err := json.NewEncoder(w).Encode(p); err != nil {
+			slog.Error("Failed to encode response", "error", err)
+		}
 	}
 }
 
@@ -46,34 +76,55 @@ func FetchPokemon(db *sqlx.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := r.URL.Query().Get("name")
 		if name == "" {
+			slog.Warn("Request missing pokemon name")
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
-			_, _ = fmt.Fprintf(w, "Name is required")
+			if err := json.NewEncoder(w).Encode(map[string]string{"error": "Name is required"}); err != nil {
+				slog.Error("Failed to encode error response", "error", err)
+			}
+			return
 		}
 
 		p, err := api.Search(name)
 		if err != nil {
+			slog.Error("Failed to fetch pokemon from API", "name", name, "error", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = fmt.Fprintf(w, "Error fetching pokemon from the api: %s", err)
+			if err := json.NewEncoder(w).Encode(map[string]string{"error": "Error fetching pokemon from the api"}); err != nil {
+				slog.Error("Failed to encode error response", "error", err)
+			}
+			return
 		}
 
 		exists, err := database.Exists(db, p.Id)
 		if err != nil {
+			slog.Error("Failed to check if pokemon exists", "name", name, "id", p.Id, "error", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = fmt.Fprintf(w, "Error checking if pokemon exists: %s", err)
+			if err := json.NewEncoder(w).Encode(map[string]string{"error": "Error checking if pokemon exists"}); err != nil {
+				slog.Error("Failed to encode error response", "error", err)
+			}
+			return
 		}
 
 		if !exists {
 			err = database.Save(db, p)
 			if err != nil {
+				slog.Error("Failed to save pokemon", "name", name, "id", p.Id, "error", err)
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusInternalServerError)
-				_, _ = fmt.Fprintf(w, "Error saving pokemon: %s", err)
+				if err := json.NewEncoder(w).Encode(map[string]string{"error": "Error saving pokemon"}); err != nil {
+					slog.Error("Failed to encode error response", "error", err)
+				}
+				return
 			}
+			slog.Info("Saved new pokemon", "name", name, "id", p.Id)
 		}
 
-		_ = json.NewEncoder(w).Encode(p)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(p); err != nil {
+			slog.Error("Failed to encode response", "error", err)
+		}
 	}
 }
